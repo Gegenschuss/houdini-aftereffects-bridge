@@ -3,13 +3,13 @@
 Guidance for Claude (and contributors) working on this exporter.  Read
 this BEFORE editing the math, the layer-type rotation handling, or the
 JSX format -- the conventions here are the inverse of
-`aftereffects-to-houdini-usd-exporter` and need to stay paired.
+`houdini-aftereffects-bridge` (formerly aftereffects-to-houdini-usd-exporter) and need to stay paired.
 
 ## What this is
 
 A Solaris LOP HDA that walks a USD stage and writes an After Effects
 .jsx that recreates the scene as a comp.  Reverse of
-`aftereffects-to-houdini-usd-exporter`'s `GegenschussAeUsdExporter.jsx`.
+`houdini-aftereffects-bridge` (formerly aftereffects-to-houdini-usd-exporter)'s `GegenschussAeUsdExporter.jsx`.
 Same AE↔USD coordinate conversion, applied in inverse.
 
 ## Repo orientation
@@ -36,7 +36,7 @@ Same AE↔USD coordinate conversion, applied in inverse.
 
 ## Coordinate convention (inverse)
 
-Forward (AE -> USD), from `aftereffects-to-houdini-usd-exporter`:
+Forward (AE -> USD), from `houdini-aftereffects-bridge` (formerly aftereffects-to-houdini-usd-exporter):
 
 ```
 position:  ( px / s, -py / s, -pz / s)        s = scale (default 100)
@@ -181,7 +181,7 @@ PITCH_30, YAW_45, ROLL_20) should match to 10 decimals.  This catches
 any regression of the 1-node Euler camera handling -- specifically
 ROLL_20 will go translate-only the moment we slip back to POI-only.
 
-Full round-trip: AE -> USD via `aftereffects-to-houdini-usd-exporter`
+Full round-trip: AE -> USD via `houdini-aftereffects-bridge` (formerly aftereffects-to-houdini-usd-exporter)
 -> USD -> AE via this tool -> forward export again -> diff matrices.
 Any drift > 1e-7 on translation / rotation (in degrees) is a bug.
 

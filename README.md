@@ -18,7 +18,7 @@ A Solaris LOP HDA that walks a USD stage and writes an After Effects
 populates it with cameras, lights, nulls, solids, and footage layers —
 preserving hierarchy and per-frame animation.
 
-This is the **reverse** of [`aftereffects-to-houdini-usd-exporter`](https://github.com/Gegenschuss/aftereffects-to-houdini-usd-exporter)
+This is the **reverse** of [`houdini-aftereffects-bridge` (formerly aftereffects-to-houdini-usd-exporter)](https://github.com/Gegenschuss/houdini-aftereffects-bridge)
 and uses the same AE↔USD coordinate conversion applied in inverse.  The bilateral conjugation `S · M · S` (with `S = diag(1, -1, -1)`) is involutive, so the same matrix function maps both directions.
 
 ## Why
@@ -171,7 +171,7 @@ Not yet visually verified end-to-end:
 
 ## Companion repos
 
-- [`aftereffects-to-houdini-usd-exporter`](https://github.com/Gegenschuss/aftereffects-to-houdini-usd-exporter) —
+- [`houdini-aftereffects-bridge` (formerly aftereffects-to-houdini-usd-exporter)](https://github.com/Gegenschuss/houdini-aftereffects-bridge) —
   forward direction (AE → USD).  Same coordinate conversion, applied in reverse.
 
 ## Licence
