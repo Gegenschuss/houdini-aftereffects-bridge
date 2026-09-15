@@ -3,7 +3,7 @@
 Guidance for Claude (and contributors) working on this exporter.  Read
 this BEFORE editing the math, the layer-type rotation handling, or the
 JSX format -- the conventions here are the inverse of
-`houdini-aftereffects-bridge` (formerly aftereffects-to-houdini-usd-exporter) and need to stay paired.
+`GegenschussAeUsdExporter.jsx` at the root of this repo (houdini-aftereffects-bridge) and need to stay paired.
 
 ## What this is
 

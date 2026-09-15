@@ -7,7 +7,7 @@ coordinate convention (measured in AE 26.3, see below).
 |------|-----------|-------|
 | **AE → Houdini USD Exporter** | AE comp → USD file for Solaris | `GegenschussAeUsdExporter.jsx` (this README, below) |
 | **AE Cam Link** | Houdini cameras / nulls / points → self-updating AE `.jsx` (baked) | `houdini-ae-camlink/`, built HDA in `otls/` |
-| Solaris AE Export | USD stage → AE comp with hierarchy | separate repo: [`houdini-to-aftereffects-usd-exporter`](https://github.com/Gegenschuss/houdini-to-aftereffects-usd-exporter) |
+| **Solaris AE Export** | USD stage → AE comp with hierarchy (LOP HDA) | `solaris-ae-export/`, built HDA in `solaris-ae-export/otls/` |
 
 Shared convention:
 
@@ -21,7 +21,8 @@ The rotation composition was measured in AE 26.3 with `houdini-ae-camlink/ae_rot
 (result: `houdini-ae-camlink/ae_rotation_probe_result_AE26.txt`). Run it again before changing any
 rotation math in this repo or its Solaris twin.
 
-This repo was `aftereffects-to-houdini-usd-exporter` until 2026-09-15; GitHub redirects the old URL.
+This repo was `aftereffects-to-houdini-usd-exporter` until 2026-09-15 (GitHub redirects the old URL), and
+`houdini-to-aftereffects-usd-exporter` was folded in as `solaris-ae-export/` the same day, history included.
 
 ---
 
