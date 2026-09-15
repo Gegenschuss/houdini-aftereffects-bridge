@@ -29,7 +29,10 @@ Both Houdini exporters emit the same data structure and embed the same two files
   with continuity through gimbal lock, channel packing and JSX assembly.
 
 So one file defines the maths and one file defines what happens in AE; the exporters only
-decide what to sample (OBJ world transforms per frame vs USD prims with hierarchy).
+decide what to sample (OBJ world transforms per frame vs USD prims with hierarchy). Both nodes
+share the same parameter layout too: JSX File, Comp Name, World Scale, Origin At Comp Center,
+frame range, AE Time, Frame Offset, Linear Keyframes, Export JSX; tool-specific extras sit in
+collapsible sections (Points To Nulls on Cam Link, Comp Settings on Solaris AE Export).
 
 The rotation composition was measured in AE 26.3 with `houdini-ae-camlink/ae_rotation_probe.jsx`
 (result: `houdini-ae-camlink/ae_rotation_probe_result_AE26.txt`). Run it again before changing any

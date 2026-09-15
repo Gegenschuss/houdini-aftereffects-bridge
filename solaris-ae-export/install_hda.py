@@ -112,137 +112,122 @@ def export_jsx(node):
     if stage is None:
         raise hou.NodeError("Input did not produce a USD stage.")
 
-    out_path = node.parm("output_jsx").evalAsString().strip()
+    out_path = node.parm("file_path").evalAsString().strip()
     if not out_path:
-        raise hou.NodeError("Output JSX path is empty.")
+        raise hou.NodeError("JSX File path is empty.")
+    if not out_path.lower().endswith(".jsx"):
+        out_path += ".jsx"
 
     # Resolve and call the core module.
     mod = _resolve_module(node)
 
+    fps = node.parm("fps").evalAsFloat() or None          # None = stage metadata / hip fps
+    w, h = node.parmTuple("comp_size").eval()
     kwargs = {
-        "scale":              node.parm("scale").evalAsFloat(),
-        "comp_width":         node.parm("comp_width").evalAsInt(),
-        "comp_height":        node.parm("comp_height").evalAsInt(),
-        "fps":                node.parm("fps").evalAsFloat(),
-        "unwrap_ae_scene":    node.parm("unwrap_ae_scene").evalAsInt() == 1,
-        "comp_mode":          node.parm("comp_mode").evalAsString(),
-        "linear":             node.parm("linear_keys").evalAsInt() == 1,
-        "time_base":          node.parm("time_base").evalAsInt(),
-        "runtime_js":         _runtime_js(node),
+        "scale":            node.parm("world_scale").evalAsFloat(),
+        "comp_width":       int(w) or None,
+        "comp_height":      int(h) or None,
+        "fps":              fps,
+        "unwrap_ae_scene":  node.parm("unwrap_ae_scene").evalAsInt() == 1,
+        "comp_mode":        node.parm("comp_mode").evalAsString(),
+        "linear":           node.parm("linear_keys").evalAsInt() == 1,
+        "center_origin":    node.parm("center_origin").evalAsInt() == 1,
+        "time_mode":        node.parm("time_mode").evalAsString(),
+        "frame_offset":     node.parm("frame_offset").evalAsInt(),
+        "runtime_js":       _runtime_js(node),
     }
     name = node.parm("comp_name").evalAsString().strip()
-    if name:
-        kwargs["comp_name"] = name
-    if node.parm("frame_range_use").evalAsInt() == 1:
-        kwargs["start_frame"] = node.parm("frame_range1").evalAsInt()
-        kwargs["end_frame"]   = node.parm("frame_range2").evalAsInt()
+    kwargs["comp_name"] = name or hou.text.expandString("$HIPNAME")
+    if node.parm("range_toggle").evalAsInt() == 1:
+        kwargs["start_frame"] = node.parm("frame_rangemin").evalAsInt()
+        kwargs["end_frame"]   = node.parm("frame_rangemax").evalAsInt()
     if node.parm("duration_override").evalAsFloat() > 0:
         kwargs["duration_s"] = node.parm("duration_override").evalAsFloat()
 
     summary = mod.usd_to_jsx(stage, out_path, **kwargs)
 
-    msg = (
-        "Wrote {out_path}\\n"
-        "  {n_cams} cam, {n_lights} light, {n_nulls} null, "
-        "{n_solids} solid, {n_footage} footage\\n"
-        "  Frames {fr0}-{fr1} @ {fps} fps  ({w} x {h})"
-    ).format(
-        out_path=summary["out_path"],
-        n_cams=summary["n_cams"], n_lights=summary["n_lights"],
-        n_nulls=summary["n_nulls"], n_solids=summary["n_solids"],
-        n_footage=summary["n_footage"],
-        fr0=summary["frame_range"][0], fr1=summary["frame_range"][1],
-        fps=summary["fps"], w=summary["comp_w"], h=summary["comp_h"],
-    )
-    hou.ui.displayMessage(msg, title="AE Export")
+    msg = ("Solaris AE Export: wrote {out_path}  |  {n_cams} camera(s), {n_lights} light(s), "
+           "{n_nulls} null(s), {n_solids} solid(s), {n_footage} footage, frames {fr0}-{fr1} @ {fps:g} fps"
+           ).format(out_path=summary["out_path"], n_cams=summary["n_cams"], n_lights=summary["n_lights"],
+                    n_nulls=summary["n_nulls"], n_solids=summary["n_solids"], n_footage=summary["n_footage"],
+                    fr0=summary["frame_range"][0], fr1=summary["frame_range"][1], fps=summary["fps"])
+    print(msg)
+    if hou.isUIAvailable():
+        hou.ui.setStatusMessage(msg, severity=hou.severityType.Message)
 '''
 
 
 def _build_param_template_group():
-    """Define the LOP HDA's parameter UI."""
+    """Parameter UI, laid out like the bridge's AE Cam Link OBJ node."""
     import hou
     g = hou.ParmTemplateGroup()
+    F = hou.FolderParmTemplate("solaris_ae_export", "Solaris AE Export", folder_type=hou.folderType.Simple)
 
-    g.append(hou.StringParmTemplate(
-        "output_jsx", "Output JSX", 1,
-        default_value=("$HIP/$OS.jsx",),
-        string_type=hou.stringParmType.FileReference,
-        file_type=hou.fileType.Any,
-        tags={"filechooser_pattern": "*.jsx", "filechooser_mode": "write"},
-    ))
-
-    g.append(hou.StringParmTemplate(
-        "comp_name", "Comp name", 1, default_value=("$OS",),
-        help="$OS evaluates to this node's name.  Set to empty to fall back "
-             "to the stage's defaultPrim name or the output filename.",
-    ))
-
-    g.append(hou.IntParmTemplate(
-        "comp_width", "Comp width (px)", 1, default_value=(1920,), min=1, max=16384,
-    ))
-    g.append(hou.IntParmTemplate(
-        "comp_height", "Comp height (px)", 1, default_value=(1080,), min=1, max=16384,
-        help="If 0, derived from the first Camera's apertureV/apertureH ratio.",
-    ))
-    g.append(hou.FloatParmTemplate(
-        "fps", "FPS", 1, default_value=(25.0,), min=0.0, max=240.0,
-        help="0 = read from stage metadata.",
-    ))
-    g.append(hou.FloatParmTemplate(
-        "scale", "Scale (AE px / USD unit)", 1,
-        default_value=(100.0,), min=0.0001, max=10000.0,
-        help="Must match the AE-side exporter's Scale; default 100 = 1 m -> 100 px.",
-    ))
-    g.append(hou.FloatParmTemplate(
-        "duration_override", "Comp duration (s)", 1, default_value=(0.0,), min=0.0,
-        help="0 = derived from frame range / FPS.",
-    ))
-    g.append(hou.LabelParmTemplate(
-        "duration_info", "",
-        column_labels=("0 = automatic (frame range / FPS)",),
-    ))
-
-    folder = hou.FolderParmTemplate("frame_range_folder", "Frame range")
-    folder.addParmTemplate(hou.ToggleParmTemplate(
-        "frame_range_use", "Override stage range", default_value=False,
-    ))
-    folder.addParmTemplate(hou.IntParmTemplate(
-        "frame_range", "Range", 2, default_value=(1, 240),
-        disable_when="{ frame_range_use == 0 }",
-    ))
-    g.append(folder)
-
-    g.append(hou.MenuParmTemplate(
-        "comp_mode", "Target comp", ("reuse", "new"),
+    F.addParmTemplate(hou.StringParmTemplate(
+        "file_path", "JSX File", 1, string_type=hou.stringParmType.FileReference,
+        default_value=("$HIP/camlink/$OS.jsx",), file_type=hou.fileType.Any,
+        tags={"filechooser_mode": "write", "filechooser_pattern": "*.jsx"},
+        help="Keep this path stable: re-running the same file in AE updates the layers in place."))
+    F.addParmTemplate(hou.StringParmTemplate(
+        "comp_name", "Comp Name", 1, default_value=("",),
+        help="Comp to update or create in AE. Empty = $HIPNAME."))
+    F.addParmTemplate(hou.MenuParmTemplate(
+        "comp_mode", "Target Comp", ("reuse", "new"),
         ("Update active comp (or comp by name, else create)", "Always create a new comp"),
         default_value=0,
-        help="Layers are tagged with their USD path in the layer Comment; re-running the JSX "
-             "on the same comp updates them in place instead of importing again.",
-    ))
-    g.append(hou.ToggleParmTemplate(
-        "linear_keys", "Linear keyframes", default_value=True,
-        help="Set every written keyframe to linear interpolation.",
-    ))
-    g.append(hou.IntParmTemplate(
-        "time_base", "USD frame at 0 s", 1, default_value=(0,), min=-100000, max=100000,
-        help="USD frame that lands at time 0 in AE. 0 keeps absolute timecode / fps; "
-             "set it to the range start to have the export begin at 0 s.",
-    ))
-    g.append(hou.ToggleParmTemplate(
-        "unwrap_ae_scene", "Unwrap AE_Scene wrapper", default_value=True,
-        help="If the stage's top-level prim is named AE_Scene with a single translate "
-             "(the exporter's centre-comp wrapper), strip it on import to keep "
-             "round-trips identity.",
-    ))
+        help="Layers are tagged with their USD path in the layer Comment, so re-running the JSX "
+             "on the same comp replaces their keyframes instead of importing again."))
+    F.addParmTemplate(hou.SeparatorParmTemplate("sep1"))
+    F.addParmTemplate(hou.FloatParmTemplate(
+        "world_scale", "World Scale", 1, default_value=(100.0,), min=0.0001, max=100000.0,
+        help="AE pixels per USD unit. 100 matches the AE-side exporter's default for round-trips; "
+             "AE Cam Link uses 1000 for Houdini-authored scenes."))
+    F.addParmTemplate(hou.ToggleParmTemplate(
+        "center_origin", "Origin At Comp Center", default_value=True,
+        help="Put the USD world origin at the comp center (width/2, height/2). Ignored for stages "
+             "that carry the AE-side exporter's AE_Scene wrapper, which already encodes the offset."))
+    F.addParmTemplate(hou.SeparatorParmTemplate("sep2"))
+    F.addParmTemplate(hou.ToggleParmTemplate(
+        "range_toggle", "Use Frame Range", default_value=False,
+        help="Off = the stage's start/end timecodes."))
+    fr = hou.IntParmTemplate("frame_range", "Frame Range", 2, default_value=(1, 240),
+                             default_expression=("$FSTART", "$FEND"),
+                             naming_scheme=hou.parmNamingScheme.MinMax)
+    fr.setConditional(hou.parmCondType.DisableWhen, "{ range_toggle == 0 }")
+    F.addParmTemplate(fr)
+    F.addParmTemplate(hou.MenuParmTemplate(
+        "time_mode", "AE Time", ("stage", "range"),
+        ("Stage time (timecode / fps)", "First exported frame at 0 s"), default_value=0,
+        help="Stage time keeps AE round-trips identical (USD frame 0 = 0 s)."))
+    F.addParmTemplate(hou.IntParmTemplate(
+        "frame_offset", "Frame Offset", 1, default_value=(0,), min=-100, max=100,
+        help="Shift all AE keys by this many frames (e.g. plate handles)."))
+    F.addParmTemplate(hou.ToggleParmTemplate(
+        "linear_keys", "Linear Keyframes", default_value=True,
+        help="Set every written keyframe to linear interpolation."))
+    F.addParmTemplate(hou.SeparatorParmTemplate("sep3"))
 
-    g.append(hou.SeparatorParmTemplate("sep1"))
-    g.append(hou.ButtonParmTemplate(
-        "execute", "Save JSX",
+    CF = hou.FolderParmTemplate("comp_folder", "Comp Settings", folder_type=hou.folderType.Collapsible)
+    CF.addParmTemplate(hou.IntParmTemplate(
+        "comp_size", "Comp Size", 2, default_value=(1920, 1080), min=0, max=16384,
+        naming_scheme=hou.parmNamingScheme.XYZW,
+        help="Used when a comp is created. Height 0 = derived from the first camera's aperture ratio."))
+    CF.addParmTemplate(hou.FloatParmTemplate(
+        "fps", "FPS", 1, default_value=(0.0,), min=0.0, max=240.0,
+        help="0 = stage metadata, else the hip's FPS."))
+    CF.addParmTemplate(hou.FloatParmTemplate(
+        "duration_override", "Comp Duration (s)", 1, default_value=(0.0,), min=0.0,
+        help="0 = frame range / FPS."))
+    CF.addParmTemplate(hou.ToggleParmTemplate(
+        "unwrap_ae_scene", "Unwrap AE_Scene Wrapper", default_value=True,
+        help="Strip the centre-comp parent the AE-side exporter adds, so round-trips stay identity."))
+    F.addParmTemplate(CF)
+
+    F.addParmTemplate(hou.ButtonParmTemplate(
+        "run_script", "Export JSX",
         script_callback="hou.phm().export_jsx(kwargs['node'])",
-        script_callback_language=hou.scriptLanguage.Python,
-        join_with_next=False,
-    ))
-
+        script_callback_language=hou.scriptLanguage.Python))
+    g.append(F)
     return g
 
 

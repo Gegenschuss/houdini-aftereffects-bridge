@@ -94,23 +94,24 @@ install_hda("/path/to/repo/otls/gegenschuss_ae_export.hda")
    (`sopimport`, `karma`, file `usd_import`, etc.).
 2. Drop a **Gegenschuss AE Export** node and wire your stage into its
    single input.
-3. Set the parameters:
-   - **Output JSX** — where to write the script (defaults to `$HIP/<node>.jsx`)
-   - **Comp name** — leave blank to use the stage's `defaultPrim` name
-   - **Comp width / height** — defaults 1920×1080.  Height of 0 derives
-     from the first Camera prim's aperture ratio.
-   - **FPS** — 0 = read from stage metadata
-   - **Scale** — must match the AE-side exporter's Scale (default 100,
-     so 1 USD unit = 100 AE px = 1 m at default Houdini scale)
-   - **Frame range** — defaults to the stage's start/end timecodes
-   - **Unwrap AE_Scene wrapper** — strips the centre-comp parent the
-     AE-side exporter adds, so round-trips stay identity
-   - **Target comp** — update the active comp (or one named like the comp
-     name) in place, or always create a new comp. Layers are tagged with
-     their USD path in the layer Comment, so re-running a newer export
-     replaces their keyframes instead of importing again.
-   - **Linear keyframes**, **USD frame at 0 s** — interpolation and time base
-4. Hit **Save JSX**.  A confirmation dialog reports the prim counts.
+3. Set the parameters (same layout as the bridge's AE Cam Link node):
+   - **JSX File** — where to write the script (default `$HIP/camlink/<node>.jsx`).
+     Keep it stable: re-running the same file in AE updates the layers in place.
+   - **Comp Name** — comp to update or create; empty = `$HIPNAME`
+   - **Target Comp** — update the active comp (or one by that name, else
+     create), or always create a new comp
+   - **World Scale** — AE px per USD unit; 100 matches the AE-side exporter
+     for round-trips, AE Cam Link uses 1000 for Houdini-authored scenes
+   - **Origin At Comp Center** — world origin at the comp centre. Ignored
+     for stages with the AE-side `AE_Scene` wrapper (they already carry it)
+   - **Use Frame Range / Frame Range** — off = stage start/end timecodes
+   - **AE Time** — stage time (timecode / fps, round-trip identity) or first
+     exported frame at 0 s; **Frame Offset** shifts all keys
+   - **Linear Keyframes**
+   - **Comp Settings** (collapsed): comp size (height 0 = from camera
+     aperture ratio), FPS (0 = stage, else hip fps), comp duration
+     (0 = automatic), unwrap `AE_Scene` wrapper
+4. Hit **Export JSX**.  The status bar reports the layer counts.
 5. In After Effects: `File → Scripts → Run Script File…` → pick the JSX.
    First run creates the layers; later runs update them in place.
 

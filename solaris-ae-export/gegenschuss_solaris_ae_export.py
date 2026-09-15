@@ -674,7 +674,8 @@ def usd_to_jsx(stage, out_jsx_path,
                duration_s=None, scale=DEFAULT_SCALE,
                start_frame=None, end_frame=None,
                unwrap_ae_scene=True, par=1.0,
-               comp_mode="reuse", linear=True, time_base=0, runtime_js=None):
+               comp_mode="reuse", linear=True, time_base=0, runtime_js=None,
+               center_origin=True, time_mode="stage", frame_offset=0):
     """Walk `stage` and write a JSX to `out_jsx_path`.
 
     `stage` may be a Usd.Stage or a path to a USD file.  All other
@@ -703,7 +704,13 @@ def usd_to_jsx(stage, out_jsx_path,
 
     # Stage metadata fallbacks.
     if fps is None:
-        fps = stage.GetFramesPerSecond() or DEFAULT_COMP_FPS
+        fps = stage.GetFramesPerSecond()
+        if not fps:
+            try:
+                import hou
+                fps = hou.fps()
+            except Exception:
+                fps = DEFAULT_COMP_FPS
     if start_frame is None:
         start_frame = int(stage.GetStartTimeCode())
     if end_frame is None:
@@ -746,10 +753,21 @@ def usd_to_jsx(stage, out_jsx_path,
         stage, start_frame, end_frame, scale, comp_width,
         unwrap_ae_scene=unwrap_ae_scene,
     )
+    # Time base: "range" puts the first exported frame at 0 s; "stage" keeps
+    # USD timecode / fps (round-trip identity).  frame_offset shifts everything.
+    if time_mode == "range":
+        time_base = start_frame
+    time_base = time_base - frame_offset
+    # A stage carrying the AE-side exporter's AE_Scene wrapper already encodes
+    # the comp-centre offset; never re-centre those.
+    has_wrapper = any(p.GetName() == "AE_Scene" and p.GetTypeName() == "Xform"
+                      for p in stage.GetPseudoRoot().GetChildren())
     data = _build_data(stage, nodes, comp_name, comp_width, comp_height, fps,
                        start_frame, end_frame, par=par, comp_mode=comp_mode, linear=linear,
                        time_base=time_base, source=stage.GetRootLayer().identifier if stage.GetRootLayer() else "")
     data["duration"] = round(float(duration_s), 6)
+    data["centerOrigin"] = bool(center_origin) and not has_wrapper
+    data["displayStart"] = round(start_frame / float(fps), 6) if time_mode == "range" else 0.0
     text = C.build_jsx(data, runtime_js or _default_runtime_js())
 
     # Write UTF-8.  AE's $.evalFile reads JSX as UTF-8 fine.
