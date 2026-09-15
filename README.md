@@ -1,16 +1,35 @@
-# AE → Houdini USD Exporter
+# Houdini ↔ After Effects Bridge
+
+Tools for moving 3D scenes between After Effects and Houdini in both directions, sharing one
+coordinate convention (measured in AE 26.3, see below).
+
+| Tool | Direction | Where |
+|------|-----------|-------|
+| **AE → Houdini USD Exporter** | AE comp → USD file for Solaris | `GegenschussAeUsdExporter.jsx` (this README, below) |
+| **AE Cam Link** | Houdini cameras / nulls / points → self-updating AE `.jsx` (baked) | `houdini-ae-camlink/`, built HDA in `otls/` |
+| Solaris AE Export | USD stage → AE comp with hierarchy | separate repo: [`houdini-to-aftereffects-usd-exporter`](https://github.com/Gegenschuss/houdini-to-aftereffects-usd-exporter) |
+
+Shared convention:
+
+```
+position: (x, -y, -z) * scale
+rotation: (rx, -ry, -rz)   AE composes X/Y/Z Rotation as Rx*Ry*Rz (Z innermost), same as Orientation
+zoom:     focal / aperture * comp width
+```
+
+The rotation composition was measured in AE 26.3 with `houdini-ae-camlink/ae_rotation_probe.jsx`
+(result: `houdini-ae-camlink/ae_rotation_probe_result_AE26.txt`). Run it again before changing any
+rotation math in this repo or its Solaris twin.
+
+This repo was `aftereffects-to-houdini-usd-exporter` until 2026-09-15; GitHub redirects the old URL.
+
+---
+
+## AE → Houdini USD Exporter
 
 > 🚧 Early release — cameras, nulls, hierarchy, translations, solids, footage, text and shape layers are verified against AE preview. Light render output across all four types isn't yet visually confirmed in Karma. Open an issue if you hit something off.
 
 ExtendScript that exports an After Effects composition's 3D layers — cameras, lights, nulls, AVLayers, solids, footage, text and shape layers — to a USD ASCII file ready for import into Houdini.
-
-## Also in this repo: AE Cam Link (Houdini → AE, baked)
-
-`houdini-ae-camlink/` holds the Object-level Houdini HDA that bakes cameras, nulls and optional
-point markers into a self-updating `.jsx` (re-running it updates the same AE layers in place).
-Built asset: `otls/gegenschuss_ae_camlink.hdalc`. See `houdini-ae-camlink/README.md`.
-The AE rotation-channel composition used by every tool here was measured in AE 26.3 with
-`houdini-ae-camlink/ae_rotation_probe.jsx`.
 
 ## Why
 
@@ -20,7 +39,7 @@ Direct AE → USD without going through Cinema4D / Alembic round-trips. Smaller 
 
 ```
 position: (x, -y, -z)
-rotation: (rx, -ry, -rz)
+rotation: (rx, -ry, -rz)   (channels composed Rx*Ry*Rz, see top of this README)
 ```
 
 — a bilateral conjugation by `S = diag(1, -1, -1)` that maps AE's left-handed Y-down coordinate system into USD's right-handed Y-up.  The formula is the unique sign pattern that both performs the basis change and preserves identity (identity AE → identity USD), so grafted Y-up Houdini geometry stays correctly oriented through the round-trip.
