@@ -1064,14 +1064,16 @@
         return [[c,-s,0],[s,c,0],[0,0,1]];
     }
 
-    // AE rotation: Orientation (X*Y*Z order) then individual X/Y/Z rotations.
+    // AE rotation: Orientation (X*Y*Z order) then individual X/Y/Z rotations,
+    // which compose X*Y*Z as well (Z innermost) -- measured in AE 26.3 with a
+    // toWorldVec probe on nulls and cameras (was Z*Y*X, wrong for multi-axis).
     // Verified empirically by probing AE's rendered camera matrix with
     // toWorld() expressions and comparing to script output: matches AE
     // ground truth to ~1e-4 across all tested frames.  The previous Y*X*Z
     // order was the source of the persistent ~2° rotation drift.
     function aeRotMatrix(ori, xr, yr, zr) {
         var Mo = m3mul(rotX(ori[0]), m3mul(rotY(ori[1]), rotZ(ori[2])));
-        var Mi = m3mul(rotZ(zr),    m3mul(rotY(yr),     rotX(xr)));
+        var Mi = m3mul(rotX(xr),    m3mul(rotY(yr),     rotZ(zr)));   // measured 2026-09-15: X*Y*Z, same as Orientation
         return m3mul(Mo, Mi);
     }
 

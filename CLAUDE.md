@@ -33,7 +33,7 @@ var Mo = m3mul(rotX(ori[0]), m3mul(rotY(ori[1]), rotZ(ori[2])));   // ✓ correc
 
 **Verified empirically** with the probe-null script (`Verifying against AE` below). The `Y*X*Z` order — which various Adobe docs, ProVideoCoalition articles, and community plugins assume — produces a ~2° drift on animated 2-node cameras. `X*Y*Z` matches AE's rendered camera matrix to ~1e-4 across all tested frames.
 
-The X/Y/Z Rotation order (`Mi`) is currently `Z*Y*X`. Untested empirically (test cameras have all-zero individual rotations). If a similar drift appears on cameras/nulls with non-zero X/Y/Z Rotation values, suspect that order next.
+The X/Y/Z Rotation order (`Mi`) is `X*Y*Z` (Z innermost), the same as Orientation. **Measured 2026-09-15** in AE 26.3 with a toWorldVec probe on nulls and cameras (ten multi-axis cases, exact fit); the earlier `Z*Y*X` assumption was off by up to 2.0 in the matrix entries once several channels were non-zero.
 
 ## 2-node camera composition
 
@@ -224,7 +224,7 @@ Done since first release (kept here so future sessions don't re-litigate solved 
 Still pending:
 
 - **Light visual verification in Houdini/Karma.**  ⭐ The #1 item.  All four types export data; per-type intensity tuning (Sphere × 1.0, Distant × 0.05, Dome × 0.01, plus `inputs:normalize = 1` and `radius = 0.1` for SphereLight) is the current convention. Needs a render-comparison sweep: AE preview vs Houdini render, all four types.
-- **X/Y/Z Rotation order (`Mi`) is `Z*Y*X`, untested.** All test cameras have zero individual X/Y/Z Rotations. If a `~2°` drift appears on cameras/nulls with non-zero values, suspect this Euler order next and run the probe trick.
+- ~~X/Y/Z Rotation order untested~~ -- resolved 2026-09-15: measured `X*Y*Z` (Z innermost), `Mi` fixed accordingly.
 - **Vector geometry edge cases.**  Still skipped: Merge Paths, Repeater, Wiggle Paths, Pucker & Bloat, Twist.  (Hole subtraction + Trim Paths now shipped.)  All graceful — fall back to bbox quad when no paths could be extracted.  Merge Paths needs robust polygon boolean ops; Repeater is a duplicate-with-incremental-transform; the deformers (Wiggle/Pucker/Twist) are per-vertex displacers (Wiggle is time-random — won't match AE exactly).
 - **Roadmap features** (impact-ordered, not yet started): Houdini-side import HDA/LOP (sublayer + viewport camera + guide toggle) — highest net-new value, but needs Houdini to author/test; multi-comp / batch export (refactor core into `exportComp(comp, file, opts)` — large, high untested-regression risk); references / payloads / variants (architectural — needs design + AE testing).
 
