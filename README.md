@@ -4,6 +4,14 @@
 
 ExtendScript that exports an After Effects composition's 3D layers — cameras, lights, nulls, AVLayers, solids, footage, text and shape layers — to a USD ASCII file ready for import into Houdini.
 
+## Also in this repo: AE Cam Link (Houdini → AE, baked)
+
+`houdini-ae-camlink/` holds the Object-level Houdini HDA that bakes cameras, nulls and optional
+point markers into a self-updating `.jsx` (re-running it updates the same AE layers in place).
+Built asset: `otls/gegenschuss_ae_camlink.hdalc`. See `houdini-ae-camlink/README.md`.
+The AE rotation-channel composition used by every tool here was measured in AE 26.3 with
+`houdini-ae-camlink/ae_rotation_probe.jsx`.
+
 ## Why
 
 Direct AE → USD without going through Cinema4D / Alembic round-trips. Smaller files, preserved hierarchy, no per-layer Z stacking, no time stretching from fps mismatches.
