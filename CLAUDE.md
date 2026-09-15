@@ -79,7 +79,7 @@ hidden".  The writer routes each kind to the correct AE construct:
 **Cameras stay 1-node** (`NO_AUTO_ORIENT`) deliberately.  The 2-node /
 POI path silently drops any roll around the look axis -- AE's lookAt
 gives a roll-free orientation, so animated 2-node orbit cameras
-accumulate a small twist that POI can't reproduce.  Going through ZYX
+accumulate a small twist that POI can't reproduce.  Going through the
 Euler decomposition is matrix-exact regardless of whether the original
 camera was 1- or 2-node, so we always emit 1-node.
 
@@ -94,7 +94,9 @@ column in column-vector form) projected forward 1000 px.
 ## Euler decomposition
 
 Cameras + AVLayers go through `euler_zyx_from_matrix`, which decomposes
-R = Rz(zr) * Ry(yr) * Rx(xr) into degrees.  Orientation stays at
+R = Rx(xr) * Ry(yr) * Rz(zr) (column form, Z innermost -- AE's measured
+channel composition, see test/ae_rotation_probe_result_AE26.txt) into
+degrees.  Orientation stays at
 (0, 0, 0); all rotation goes into individual X/Y/Z Rotation channels.
 This is **lossy** when the original AE used keyed Orientation -- the
 world-space matrix is exact but the channel split won't match what was
@@ -102,6 +104,11 @@ typed in.  Round-trip is still identity at the matrix level.
 
 `euler_zyx_from_matrix` has a gimbal-lock branch at `|sin(yr)| > 0.99999`
 that pins `xr = 0` and recovers `zr` from the remaining cells.
+
+History: until 2026-09-15 the decomposition assumed Rz*Ry*Rx (X innermost).
+That only matched AE for single-axis rotations; a real shot with a panning,
+rolled camera exposed it.  `test/ae_rotation_probe.jsx` measures AE's true
+axes via toWorldVec -- run it before changing this again.
 
 ## Camera focal length
 

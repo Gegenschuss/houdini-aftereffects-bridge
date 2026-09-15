@@ -43,3 +43,13 @@ routing in `gegenschuss_solaris_ae_export.py`.
 The test/ folder is otherwise gitignored, so feel free to dump
 ad-hoc scratch files in here -- only the three files above are
 committed.
+
+## Rotation-order probe (added 2026-09-15)
+
+- **`ae_rotation_probe.jsx`** -- sets a null and a camera to ten X/Y/Z
+  Rotation combinations and asks AE for the resulting world axes via
+  `toWorldVec()`; writes `camlink_probe_result.txt` next to itself.
+- **`ae_rotation_probe_result_AE26.txt`** -- the measured answer from AE
+  26.3: AE composes the channels as `Rx * Ry * Rz` (Z innermost), same
+  as Orientation.  `euler_zyx_from_matrix` and the forward exporter's
+  `aeRotMatrix` follow this.  Re-run the probe before touching either.

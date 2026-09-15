@@ -140,7 +140,7 @@ Not yet visually verified end-to-end:
   carries a Point of Interest after import; if you need POI handles,
   flip `autoOrient` back to 2-node manually in AE.
 - **Orientation = (0, 0, 0)** — all rotation goes into individual X/Y/Z
-  Rotation channels (ZYX order).  If the original AE comp used keyed
+  Rotation channels (AE composes them Rx*Ry*Rz, Z innermost; measured in AE 26).  If the original AE comp used keyed
   Orientation, the world matrix is still exact but the channel split
   differs from what was originally typed in.
 - **Parallel / Spot lights lose roll** — AE hides the rotation channels

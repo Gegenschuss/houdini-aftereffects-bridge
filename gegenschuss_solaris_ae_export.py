@@ -113,24 +113,31 @@ def decompose_usd_mat4(m4):
 
 
 def euler_zyx_from_matrix(R):
-    """Decompose R = Rz(zr) * Ry(yr) * Rx(xr) into degrees.
+    """Decompose R = Rx(xr) * Ry(yr) * Rz(zr) (column-vector form) into degrees.
+
+    This is how After Effects composes its X/Y/Z Rotation channels
+    (Z innermost, X outermost) -- measured in AE 26.3 with a toWorldVec
+    probe (see test/ae_rotation_probe_result_AE26.txt); Orientation uses
+    the same order.  The earlier Rz*Ry*Rx assumption was only correct
+    for single-axis rotations and gave rolled or tilted cameras a wrong
+    orientation once several channels were non-zero.
 
     AE's Orientation is set to (0, 0, 0) and only individual X/Y/Z Rotation
     channels are used.  This is lossy when the original AE used keyed
     Orientation -- the world-space matrix comes out right, but the
     individual channels won't match what was originally typed in.
 
-    Gimbal-lock guard at |R[2][0]| ~ 1.
+    Gimbal-lock guard at |R[0][2]| ~ 1.
     """
-    sy = -R[2][0]
+    sy = R[0][2]
     if abs(sy) > 0.99999:
         yr = math.copysign(math.pi / 2, sy)
         xr = 0.0
-        zr = math.atan2(-R[0][1], R[1][1])
+        zr = math.atan2(R[1][0], R[1][1])
     else:
         yr = math.asin(sy)
-        xr = math.atan2(R[2][1], R[2][2])
-        zr = math.atan2(R[1][0], R[0][0])
+        xr = math.atan2(-R[1][2], R[2][2])
+        zr = math.atan2(-R[0][1], R[0][0])
     return math.degrees(xr), math.degrees(yr), math.degrees(zr)
 
 
@@ -696,8 +703,8 @@ def _emit_layer_creation(out, n, comp_var):
             n.ae_var, comp_var, name, comp_var, comp_var))
         # 1-node camera (NO_AUTO_ORIENT) so we can set xRotation /
         # yRotation / zRotation directly.  This is matrix-exact: the
-        # ZYX Euler decomposition feeds AE's aeRotMatrix(0,0,0, xr, yr,
-        # zr) = Rz*Ry*Rx, which reconstructs the original rotation
+        # Euler decomposition feeds AE's channel composition
+        # (measured: Rx*Ry*Rz, Z innermost), which reconstructs the original rotation
         # without going through AE's internal POI-based lookAt (which
         # would silently drop any roll around the look axis -- visible
         # on animated 2-node orbit cameras).

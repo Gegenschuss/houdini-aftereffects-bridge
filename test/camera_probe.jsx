@@ -33,20 +33,19 @@
     /**
      * fwd = aeRotMatrix(0, 0, 0, xr, yr, zr) * [0, 0, 1]
      * Matches the forward exporter's `aeRotMatrix` when Orientation = (0,0,0)
-     * and individual rotations are applied in Z*Y*X order.
+     * and individual rotations compose X*Y*Z (Z innermost, measured in AE 26).
      */
     function fwdFromEuler(xr, yr, zr) {
+        // Third column of Rx*Ry*Rz (AE's measured channel composition, Z innermost).
         var cx = Math.cos(rad(xr)), sx = Math.sin(rad(xr));
         var cy = Math.cos(rad(yr)), sy = Math.sin(rad(yr));
-        var cz = Math.cos(rad(zr)), sz = Math.sin(rad(zr));
         return [
-            cz * sy * cx + sz * sx,    // X
-            sz * sy * cx - cz * sx,    // Y  (AE Y goes down)
-            cy * cx                     // Z
+            sy,          // X
+            -sx * cy,    // Y  (AE Y goes down)
+            cx * cy      // Z
         ];
     }
 
-    // Comp centre as the canonical "anchor" position for these tests.
     var cx = COMP_W / 2, cy = COMP_H / 2;
 
     // Each case: position + Euler.  POI for the 2-node twin is derived

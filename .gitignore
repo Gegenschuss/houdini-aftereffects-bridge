@@ -5,6 +5,8 @@ test/*
 !test/camera_probe.jsx
 !test/camera_probe_expected.usda
 !test/README.md
+!test/ae_rotation_probe.jsx
+!test/ae_rotation_probe_result_AE26.txt
 test2/
 *.usda
 *.usd
