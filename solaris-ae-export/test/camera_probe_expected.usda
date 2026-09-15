@@ -1,0 +1,243 @@
+#usda 1.0
+(
+    defaultPrim = "AE_Scene"
+    upAxis = "Y"
+    metersPerUnit = 1
+    framesPerSecond = 25
+    timeCodesPerSecond = 25
+    startTimeCode = 0
+    endTimeCode = 124
+)
+
+# AE to Houdini USD Export
+# Comp: camera_probe  Frames: 0-124  @ 25 fps
+# Scale: 1 AE px = 0.010000 unit  Aperture: 0.3600 x 0.2025 mm
+
+def Xform "AE_Scene" (
+    kind = "group"
+)
+{
+    double3 xformOp:translate = (-9.6, 5.4, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+    def DistantLight "ROLL_20_LIGHT_1NODE" (
+        doc = "ROLL_20_LIGHT_1NODE  [Parallel]"
+    )
+    {
+        float inputs:intensity = 5
+        color3f inputs:color = (1, 1, 1)
+        bool inputs:normalize = 1
+        float inputs:angle = 0.53
+        double3 xformOp:translate = (9.6, -5.4, 10)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "ROLL_20_2NODE" (
+        doc = "ROLL_20_2NODE  [Camera  cam:2-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        double3 xformOp:translate = (9.6, -5.4, 10)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "ROLL_20_1NODE" (
+        doc = "ROLL_20_1NODE  [Camera  cam:1-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        matrix4d xformOp:transform = ( (0.9396926208, -0.3420201433, 0, 0), (0.3420201433, 0.9396926208, 0, 0), (0, 0, 1, 0), (9.6, -5.4, 10, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def DistantLight "YAW_45_LIGHT_1NODE" (
+        doc = "YAW_45_LIGHT_1NODE  [Parallel]"
+    )
+    {
+        float inputs:intensity = 5
+        color3f inputs:color = (1, 1, 1)
+        bool inputs:normalize = 1
+        float inputs:angle = 0.53
+        double3 xformOp:translate = (9.6, -5.4, 10)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "YAW_45_2NODE" (
+        doc = "YAW_45_2NODE  [Camera  cam:2-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        matrix4d xformOp:transform = ( (0.7071067659, 0, 0.7071067964, 0), (0, 1, 0, 0), (-0.7071067964, 0, 0.7071067659, 0), (9.6, -5.4, 10, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def Camera "YAW_45_1NODE" (
+        doc = "YAW_45_1NODE  [Camera  cam:1-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        matrix4d xformOp:transform = ( (0.7071067812, 0, 0.7071067812, 0), (0, 1, 0, 0), (-0.7071067812, 0, 0.7071067812, 0), (9.6, -5.4, 10, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def DistantLight "PITCH_30_LIGHT_1NODE" (
+        doc = "PITCH_30_LIGHT_1NODE  [Parallel]"
+    )
+    {
+        float inputs:intensity = 5
+        color3f inputs:color = (1, 1, 1)
+        bool inputs:normalize = 1
+        float inputs:angle = 0.53
+        double3 xformOp:translate = (9.6, -5.4, 10)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "PITCH_30_2NODE" (
+        doc = "PITCH_30_2NODE  [Camera  cam:2-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 0.8660254043, -0.4999999991, 0), (0, 0.4999999991, 0.8660254043, 0), (9.6, -5.4, 10, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def Camera "PITCH_30_1NODE" (
+        doc = "PITCH_30_1NODE  [Camera  cam:1-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 0.8660254038, -0.5, 0), (0, 0.5, 0.8660254038, 0), (9.6, -5.4, 10, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def DistantLight "FACE_PX_LIGHT_1NODE" (
+        doc = "FACE_PX_LIGHT_1NODE  [Parallel]"
+    )
+    {
+        float inputs:intensity = 5
+        color3f inputs:color = (1, 1, 1)
+        bool inputs:normalize = 1
+        float inputs:angle = 0.53
+        double3 xformOp:translate = (9.6, -5.4, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "FACE_PX_2NODE" (
+        doc = "FACE_PX_2NODE  [Camera  cam:2-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        matrix4d xformOp:transform = ( (0, 0, -1, 0), (0, 1, 0, 0), (1, 0, 0, 0), (9.6, -5.4, 0, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def Camera "FACE_PX_1NODE" (
+        doc = "FACE_PX_1NODE  [Camera  cam:1-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        matrix4d xformOp:transform = ( (0, 0, -1, 0), (0, 1, 0, 0), (1, 0, 0, 0), (9.6, -5.4, 0, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def DistantLight "FACE_PZ_LIGHT_1NODE" (
+        doc = "FACE_PZ_LIGHT_1NODE  [Parallel]"
+    )
+    {
+        float inputs:intensity = 5
+        color3f inputs:color = (1, 1, 1)
+        bool inputs:normalize = 1
+        float inputs:angle = 0.53
+        double3 xformOp:translate = (9.6, -5.4, 10)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "FACE_PZ_2NODE" (
+        doc = "FACE_PZ_2NODE  [Camera  cam:2-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        double3 xformOp:translate = (9.6, -5.4, 10)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "FACE_PZ_1NODE" (
+        doc = "FACE_PZ_1NODE  [Camera  cam:1-node(auto)]"
+    )
+    {
+        token projection = "perspective"
+        float horizontalAperture = 0.360000
+        float verticalAperture = 0.202500
+        float2 clippingRange = (0.1, 100000)
+        float horizontalApertureOffset = 0
+        float verticalApertureOffset = 0
+        float focalLength = 0.5
+        float focusDistance = 26.666667
+        double3 xformOp:translate = (9.6, -5.4, 10)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+

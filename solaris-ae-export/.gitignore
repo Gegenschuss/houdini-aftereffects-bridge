@@ -1,0 +1,30 @@
+.DS_Store
+# Ignore the test/ folder by default but keep our committed regression
+# fixtures.  Order matters: blanket-ignore first, then re-include.
+test/*
+!test/camera_probe.jsx
+!test/camera_probe_expected.usda
+!test/README.md
+!test/ae_rotation_probe.jsx
+!test/ae_rotation_probe_result_AE26.txt
+test2/
+*.usda
+*.usd
+*.usdc
+!test/camera_probe_expected.usda
+*.aep
+*.c4d
+*.abc
+*.mp4
+*.hip
+*.hipnc
+*.hiplc
+*.bgeo
+*.bgeo.sc
+__pycache__/
+*.pyc
+backup/
+otls/backup/
+
+# Local install path override -- per-machine, never published.
+install_secrets
