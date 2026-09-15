@@ -1,6 +1,6 @@
 import hou, json, math, sys
 S = sys.argv[1]
-hou.hda.installFile(S + "/build/gegenschuss_ae_camlink.hdalc")
+hou.hda.installFile("/mnt/studio/Toolbox/github/houdini-aftereffects-bridge/otls/gegenschuss_ae_camlink.hdalc")
 hou.setFps(25); hou.playbar.setFrameRange(1001, 1010); hou.playbar.setPlaybackRange(1001, 1010)
 obj = hou.node("/obj")
 cam = obj.createNode("cam", "shotcam")
@@ -23,7 +23,7 @@ txt = open(path).read()
 data = json.loads(txt[txt.index("var DATA = ") + len("var DATA = "): txt.index(";\n", txt.index("var DATA = "))])
 print("comp", data["comp"], data["width"], data["height"], data["fps"], data["start"], data["end"], "times[:3]", data["times"][:3])
 for L in data["layers"]:
-    print(L["name"], L["type"], {k: ("static" if "v" in v else "keys%d" % len(v["k"])) for k, v in L.items() if isinstance(v, dict)})
+    print(L["name"], L["type"], {k: ("static" if "v" in v else "keys%d" % len(v["k"])) for k, v in L.items() if isinstance(v, dict) and ("v" in v or "k" in v)})
 
 # --- verify: AE matrix Rz*Ry*Rx from exported channels == S * Rhou^T * S
 def rx(a):
@@ -41,9 +41,7 @@ for i, f in enumerate(range(data["start"], data["end"] + 1)):
     Sg = [[1,0,0],[0,-1,0],[0,0,-1]]
     RT = [[Rh[j][i2] for j in range(3)] for i2 in range(3)]
     Rae_expected = mm(Sg, mm(RT, Sg))
-    order = exp.parm("rot_order").evalAsString()
-    R = {"x": rx(val(L["rx"], i)), "y": ry(val(L["ry"], i)), "z": rz(val(L["rz"], i))}
-    Rae = mm(R[order[2]], mm(R[order[1]], R[order[0]]))   # column form: first axis innermost
+    Rae = mm(rx(val(L["rx"], i)), mm(ry(val(L["ry"], i)), rz(val(L["rz"], i))))   # AE: Rx*Ry*Rz
     maxerr = max(maxerr, max(abs(Rae[a][b]-Rae_expected[a][b]) for a in range(3) for b in range(3)))
     p = val(L["pos"], i); t = hou.frameToTime(f)
     exp_pos = [m[12]*1000, -m[13]*1000, -m[14]*1000]

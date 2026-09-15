@@ -2,6 +2,7 @@
 # Ignore the test/ folder by default but keep our committed regression
 # fixtures.  Order matters: blanket-ignore first, then re-include.
 test/*
+!test/test_solaris_export.py
 !test/camera_probe.jsx
 !test/camera_probe_expected.usda
 !test/README.md

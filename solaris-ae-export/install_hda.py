@@ -72,10 +72,15 @@ def _resolve_module(node):
             importlib.reload(sys.modules[MODULE_NAME])
         return importlib.import_module(MODULE_NAME)
 
-    # 2. Embedded section -- the default path for end users.
+    # 2. Embedded sections -- the default path for end users.  The shared
+    #    bridge convention module is registered first so the core module's
+    #    `import ae_convention` resolves to the embedded copy.
     defn = node.type().definition()
     if defn is not None:
         sections = defn.sections()
+        conv = sections.get("ae_convention.py")
+        if conv is not None and "ae_convention" not in sys.modules:
+            sys.modules["ae_convention"] = _module_from_string("ae_convention", conv.contents())
         section = sections.get(MODULE_SECTION)
         if section is not None:
             return _module_from_string(MODULE_NAME, section.contents())
@@ -86,6 +91,16 @@ def _resolve_module(node):
         "with the embedded module."
         .format(section=MODULE_SECTION)
     )
+
+
+def _runtime_js(node):
+    """Shared AE runtime: embedded section, else ../shared next to a disk module."""
+    defn = node.type().definition()
+    if defn is not None:
+        sec = defn.sections().get("ae_runtime.js")
+        if sec is not None:
+            return sec.contents()
+    return None
 
 
 def export_jsx(node):
@@ -110,6 +125,10 @@ def export_jsx(node):
         "comp_height":        node.parm("comp_height").evalAsInt(),
         "fps":                node.parm("fps").evalAsFloat(),
         "unwrap_ae_scene":    node.parm("unwrap_ae_scene").evalAsInt() == 1,
+        "comp_mode":          node.parm("comp_mode").evalAsString(),
+        "linear":             node.parm("linear_keys").evalAsInt() == 1,
+        "time_base":          node.parm("time_base").evalAsInt(),
+        "runtime_js":         _runtime_js(node),
     }
     name = node.parm("comp_name").evalAsString().strip()
     if name:
@@ -193,6 +212,22 @@ def _build_param_template_group():
     ))
     g.append(folder)
 
+    g.append(hou.MenuParmTemplate(
+        "comp_mode", "Target comp", ("reuse", "new"),
+        ("Update active comp (or comp by name, else create)", "Always create a new comp"),
+        default_value=0,
+        help="Layers are tagged with their USD path in the layer Comment; re-running the JSX "
+             "on the same comp updates them in place instead of importing again.",
+    ))
+    g.append(hou.ToggleParmTemplate(
+        "linear_keys", "Linear keyframes", default_value=True,
+        help="Set every written keyframe to linear interpolation.",
+    ))
+    g.append(hou.IntParmTemplate(
+        "time_base", "USD frame at 0 s", 1, default_value=(0,), min=-100000, max=100000,
+        help="USD frame that lands at time 0 in AE. 0 keeps absolute timecode / fps; "
+             "set it to the range start to have the export begin at 0 s.",
+    ))
     g.append(hou.ToggleParmTemplate(
         "unwrap_ae_scene", "Unwrap AE_Scene wrapper", default_value=True,
         help="If the stage's top-level prim is named AE_Scene with a single translate "
@@ -267,6 +302,11 @@ def install_hda(out_hda_path, icon_path=None):
         if os.path.isfile(module_py):
             with open(module_py, "r", encoding="utf-8") as f:
                 defn.addSection("gegenschuss_solaris_ae_export.py", f.read())
+        # Shared bridge files (../shared): Houdini-side conventions + AE runtime.
+        shared = os.path.join(here, "..", "shared")
+        for name in ("ae_convention.py", "ae_runtime.js"):
+            with open(os.path.join(shared, name), "r", encoding="utf-8") as f:
+                defn.addSection(name, f.read())
         # Embed the Gegenschuss logo as the HDA icon (shown in network
         # editor + tab menu).  Houdini looks up the icon section by its
         # filename (e.g. "icon.png" / "icon.svg"), not by an arbitrary

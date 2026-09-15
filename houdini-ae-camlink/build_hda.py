@@ -55,13 +55,6 @@ F.addParmTemplate(hou.MenuParmTemplate(
 F.addParmTemplate(hou.IntParmTemplate(
     "frame_offset", "Frame Offset", 1, default_value=(0,), min=-100, max=100,
     help="Shift all AE keys by this many frames (e.g. plate handles)."))
-F.addParmTemplate(hou.MenuParmTemplate(
-    "rot_order", "AE Rotation Order", ("zyx", "zxy", "yzx", "yxz", "xzy", "xyz"),
-    ("zyx  (Z first, X last)", "zxy  (Z first, Y last)", "yzx", "yxz", "xzy", "xyz  (X first, Z last)"),
-    default_value=0,
-    help="Euler order used to split the world rotation into AE X/Y/Z Rotation channels. "
-         "Every order gives exact on-frame results only if it matches how AE composes its channels; "
-         "zyx is the order the original Pa_obj2AE used. Change only if a rolled or tilted camera misbehaves in AE."))
 F.addParmTemplate(hou.ToggleParmTemplate(
     "linear_keys", "Linear Keyframes", default_value=True,
     help="Set every written keyframe to linear interpolation (one key per frame, so this only affects sub-frame motion)."))
@@ -115,10 +108,14 @@ else:
     ptg.insertBefore(ptg.entries()[0], F)
 d.setParmTemplateGroup(ptg)
 
-# ---- sections
+# ---- sections: module + the bridge's shared files (../shared)
 with open(MODULE) as fp:
     d.addSection("PythonModule", fp.read())
 d.setExtraFileOption("PythonModule/IsPython", True)
+SHARED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared")
+for name in ("ae_convention.py", "ae_runtime.js"):
+    with open(os.path.join(SHARED, name), "r", encoding="utf-8") as fp:
+        d.addSection(name, fp.read())
 d.addSection("Version", "1.0")
 d.addSection("Help", """= AE Cam Link =
 
@@ -135,8 +132,8 @@ in the active comp (or a new comp named after the hip file, sized from the camer
 Each layer is tagged with its Houdini path in the layer Comment. Re-running a newer export
 replaces the keyframes on those layers in place, so nothing has to be re-imported or re-parented.
 
-Conventions: AE position = (x, -y, -z) * World Scale; AE X/Y/Z Rotation from a Euler
-decomposition (order = *AE Rotation Order*, default zyx) with Y and Z negated; camera Zoom = focal / aperture * comp width.
+Conventions (shared/ae_convention.py, measured in AE 26): AE position = (x, -y, -z) * World Scale;
+AE X/Y/Z Rotation split as Rx*Ry*Rz with Y and Z negated; camera Zoom = focal / aperture * comp width.
 """)
 d.setMaxNumInputs(1)
 d.setMinNumInputs(0)

@@ -1,3 +1,8 @@
+> Since 2026-09-15 the JSX writer is gone from this module: it emits a data
+> structure for `../shared/ae_runtime.js` via `../shared/ae_convention.py`
+> (see the bridge README, "Shared runtime"). Sections below that describe
+> `_emit_*` functions or `JSX_HEADER` are historical.
+
 # CLAUDE.md
 
 Guidance for Claude (and contributors) working on this exporter.  Read

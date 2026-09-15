@@ -1,3 +1,8 @@
+> This repo is `houdini-aftereffects-bridge`. Besides this AE → USD exporter it holds
+> `houdini-ae-camlink/` (OBJ, baked) and `solaris-ae-export/` (LOP, hierarchy), both built on
+> `shared/ae_runtime.js` + `shared/ae_convention.py`. Rotation convention measured in AE 26.3:
+> X/Y/Z Rotation compose `Rx*Ry*Rz`, same as Orientation.
+
 # CLAUDE.md
 
 Guidance for Claude (and contributors) working on this exporter. The conventions below were verified empirically against AE preview — please don't change them based on Adobe / forum / community sources without first re-running the probe in `Verifying against AE` below.

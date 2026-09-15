@@ -13,18 +13,18 @@ Exports cameras and nulls, and optionally geometry points as markers, into one s
   by default, since AE hides null outlines during playback). A dialog asks for confirmation above the
   point limit. Marker size is in Houdini units × World Scale.
 
-Conventions, shared with the USD exporters in this repo and measured in AE 26.3
+Conventions live in `../shared/ae_convention.py` and the AE side in `../shared/ae_runtime.js`;
+both are embedded into the HDA as sections by `build_hda.py`. Measured in AE 26.3
 (`ae_rotation_probe.jsx`, result in `ae_rotation_probe_result_AE26.txt`):
 
     AE position        = (x, -y, -z) * World Scale
-    AE X/Y/Z Rotation  = (rx, -ry, -rz) of a Houdini "zyx" Euler split
-                         (AE composes its channels Rx*Ry*Rz, Z innermost; menu on the node)
+    AE X/Y/Z Rotation  = (rx, -ry, -rz), split as Rx*Ry*Rz (Z innermost, how AE composes its channels)
     AE camera Zoom     = focal / aperture * comp width
 
 ## Rebuild after editing `ae_camlink_module.py`
 
     cd /opt/hfs22.0 && source houdini_setup_bash
-    hython build_hda.py ../otls/gegenschuss_ae_camlink.hdalc ae_camlink_module.py
+    hython build_hda.py ../otls/gegenschuss_ae_camlink.hdalc ae_camlink_module.py   # embeds ../shared/*
     hython test_hda.py /tmp/scratch        # camera math check (matrix-exact)
     hython test_points.py /tmp/scratch     # points-to-markers + warning path
 

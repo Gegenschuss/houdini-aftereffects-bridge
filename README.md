@@ -7,7 +7,7 @@ coordinate convention (measured in AE 26.3, see below).
 |------|-----------|-------|
 | **AE → Houdini USD Exporter** | AE comp → USD file for Solaris | `GegenschussAeUsdExporter.jsx` (this README, below) |
 | **AE Cam Link** | Houdini cameras / nulls / points → self-updating AE `.jsx` (baked) | `houdini-ae-camlink/`, built HDA in `otls/` |
-| **Solaris AE Export** | USD stage → AE comp with hierarchy (LOP HDA) | `solaris-ae-export/`, built HDA in `solaris-ae-export/otls/` |
+| **Solaris AE Export** | USD stage → AE comp with hierarchy (LOP HDA), updates in place on re-run | `solaris-ae-export/`, built HDA in `solaris-ae-export/otls/` |
 
 Shared convention:
 
@@ -16,6 +16,20 @@ position: (x, -y, -z) * scale
 rotation: (rx, -ry, -rz)   AE composes X/Y/Z Rotation as Rx*Ry*Rz (Z innermost), same as Orientation
 zoom:     focal / aperture * comp width
 ```
+
+## Shared runtime (`shared/`)
+
+Both Houdini exporters emit the same data structure and embed the same two files at build time:
+
+- `shared/ae_runtime.js` -- the After Effects side. Finds the target comp (active, by name, or new),
+  finds layers by their `camlink:<id>` Comment tag and updates them in place or creates them
+  (camera, null, marker solid, light, solid, footage), writes keys in one batch per channel,
+  parents, in/out points, camera zoom and focus, light options, and one summary alert.
+- `shared/ae_convention.py` -- the Houdini side. Coordinate conversion, the measured Euler split
+  with continuity through gimbal lock, channel packing and JSX assembly.
+
+So one file defines the maths and one file defines what happens in AE; the exporters only
+decide what to sample (OBJ world transforms per frame vs USD prims with hierarchy).
 
 The rotation composition was measured in AE 26.3 with `houdini-ae-camlink/ae_rotation_probe.jsx`
 (result: `houdini-ae-camlink/ae_rotation_probe_result_AE26.txt`). Run it again before changing any

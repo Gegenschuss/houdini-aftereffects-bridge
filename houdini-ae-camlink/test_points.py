@@ -1,6 +1,6 @@
 import hou, json, sys
 S = sys.argv[1]
-hou.hda.installFile(S + "/build/gegenschuss_ae_camlink.hdalc")
+hou.hda.installFile("/mnt/studio/Toolbox/github/houdini-aftereffects-bridge/otls/gegenschuss_ae_camlink.hdalc")
 hou.setFps(25); hou.playbar.setFrameRange(1, 4); hou.playbar.setPlaybackRange(1, 4)
 obj = hou.node("/obj")
 cam = obj.createNode("cam", "cam1"); n1 = obj.createNode("null", "n1"); n2 = obj.createNode("null", "n2"); n2.parm("tx").set(3)

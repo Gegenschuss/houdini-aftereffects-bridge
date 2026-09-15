@@ -38,12 +38,29 @@ Public API
 import math
 import os
 import re
+import sys
 
 try:
     from pxr import Usd, UsdGeom, UsdLux, UsdShade, Sdf, Gf
     HAVE_USD = True
 except ImportError:
     HAVE_USD = False
+
+# Shared bridge conventions + AE runtime.  Inside the HDA the PythonModule
+# registers `ae_convention` from the embedded section before exec'ing this
+# file; from a repo checkout we fall back to ../shared.
+try:
+    import ae_convention as C
+except ImportError:
+    _here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() and not __file__.startswith("<") else os.getcwd()
+    sys.path.insert(0, os.path.join(_here, "..", "shared"))
+    import ae_convention as C
+
+
+def _default_runtime_js():
+    _here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() and not __file__.startswith("<") else os.getcwd()
+    with open(os.path.join(_here, "..", "shared", "ae_runtime.js"), "r", encoding="utf-8") as f:
+        return f.read()
 
 
 # ----- Constants (must match the AE-side exporter) -----
@@ -70,84 +87,27 @@ DEFAULT_DURATION_S  = 10.0
 # ----- Math -----
 
 def usd_to_ae_rot3(M):
-    """Invert the exporter's `toUSDMat3` (S * R^T * S, S = diag(1,-1,-1)).
-
-    The conjugation is involutive, so the same formula maps either way.
-    Input is a 3x3 list-of-lists in USD row-vector form; output is the
-    AE column-vector form rotation matrix.
-    """
-    return [
-        [ M[0][0], -M[1][0], -M[2][0]],
-        [-M[0][1],  M[1][1],  M[2][1]],
-        [-M[0][2],  M[1][2],  M[2][2]],
-    ]
+    """USD row-vector rotation -> AE column-vector rotation (S * M^T * S)."""
+    return C.ae_rot_from_row_matrix(M)
 
 
 def decompose_usd_mat4(m4):
-    """USD 4x4 -> (tx, ty, tz, R_ae_3x3, sx, sy, sz).
-
-    The exporter wrote rows as (R[i][:] scaled column-wise).  Reverse:
-    column lengths recover scale; per-element divide recovers R_usd;
-    `usd_to_ae_rot3` recovers the AE-space rotation.
-
-    `m4` is indexed as `m4[row][col]`.  Accepts Gf.Matrix4d or any
-    nested-sequence with the same indexing.
-    """
-    tx, ty, tz = m4[3][0], m4[3][1], m4[3][2]
-    M = [[m4[r][c] for c in range(3)] for r in range(3)]
-
-    def col_len(j):
-        return math.sqrt(M[0][j]**2 + M[1][j]**2 + M[2][j]**2)
-
-    sx, sy, sz = col_len(0), col_len(1), col_len(2)
-    sx = sx if sx > 1e-12 else 1.0
-    sy = sy if sy > 1e-12 else 1.0
-    sz = sz if sz > 1e-12 else 1.0
-
-    Rusd = [
-        [M[0][0]/sx, M[0][1]/sy, M[0][2]/sz],
-        [M[1][0]/sx, M[1][1]/sy, M[1][2]/sz],
-        [M[2][0]/sx, M[2][1]/sy, M[2][2]/sz],
-    ]
-    return tx, ty, tz, usd_to_ae_rot3(Rusd), sx, sy, sz
+    """USD 4x4 -> (tx, ty, tz, R_ae_3x3, sx, sy, sz).  See ae_convention."""
+    t, R, sc = C.decompose_row_matrix4(m4)
+    return t[0], t[1], t[2], R, sc[0], sc[1], sc[2]
 
 
 def euler_zyx_from_matrix(R):
-    """Decompose R = Rx(xr) * Ry(yr) * Rz(zr) (column-vector form) into degrees.
-
-    This is how After Effects composes its X/Y/Z Rotation channels
-    (Z innermost, X outermost) -- measured in AE 26.3 with a toWorldVec
-    probe (see test/ae_rotation_probe_result_AE26.txt); Orientation uses
-    the same order.  The earlier Rz*Ry*Rx assumption was only correct
-    for single-axis rotations and gave rolled or tilted cameras a wrong
-    orientation once several channels were non-zero.
-
-    AE's Orientation is set to (0, 0, 0) and only individual X/Y/Z Rotation
-    channels are used.  This is lossy when the original AE used keyed
-    Orientation -- the world-space matrix comes out right, but the
-    individual channels won't match what was originally typed in.
-
-    Gimbal-lock guard at |R[0][2]| ~ 1.
-    """
-    sy = R[0][2]
-    if abs(sy) > 0.99999:
-        yr = math.copysign(math.pi / 2, sy)
-        xr = 0.0
-        zr = math.atan2(R[1][0], R[1][1])
-    else:
-        yr = math.asin(sy)
-        xr = math.atan2(-R[1][2], R[2][2])
-        zr = math.atan2(-R[0][1], R[0][0])
-    return math.degrees(xr), math.degrees(yr), math.degrees(zr)
+    """AE column-form rotation -> (xr, yr, zr) with R = Rx*Ry*Rz (see ae_convention)."""
+    return C.euler_from_ae(R)
 
 
 def usd_pos_to_ae(tx, ty, tz, scale):
-    """USD world translation -> AE comp position (pixels)."""
-    return [tx * scale, -ty * scale, -tz * scale]
+    return C.ae_position((tx, ty, tz), scale)
 
 
 def usd_focal_to_ae_zoom(focal_usd, comp_width):
-    """Reverse exporter's:  focal_usd = FILM_WIDTH_MM * zoom / comp.width * MM_TO_USD."""
+    """Legacy helper (36 mm film assumption); the writer now uses focal/aperture."""
     return focal_usd * comp_width / (FILM_WIDTH_MM * MM_TO_USD)
 
 
@@ -463,8 +423,7 @@ def _sample_prim(node, start_frame, end_frame, scale, comp_width):
         tx, ty, tz, R_ae, sx, sy, sz = decompose_usd_mat4(m4)
         ae_pos = usd_pos_to_ae(tx, ty, tz, scale)
         node.pos_samples.append((f, ae_pos))
-        xr, yr, zr = euler_zyx_from_matrix(R_ae)
-        node.rot_samples.append((f, [xr, yr, zr]))
+        node.rot_samples.append((f, R_ae))
         # Only AVLayers have a meaningful scale -- nulls/cameras/lights
         # ignore it on the AE side.  We still record it; the writer
         # decides whether to emit.
@@ -486,10 +445,19 @@ def _sample_prim(node, start_frame, end_frame, scale, comp_width):
                    ae_pos[2] + fwd[2] * POI_DISTANCE]
             node.poi_samples.append((f, poi))
 
-    # Camera: zoom (px) from focalLength (USD).
+    # Camera: zoom ratio = focalLength / horizontalAperture (the AE runtime
+    # multiplies by the comp width).  Falls back to the exporter's 36 mm film
+    # width when the prim has no aperture.
     if node.kind == "Camera":
+        ap_attr = prim.GetAttribute("horizontalAperture")
+        ap_static = ap_attr.Get() if ap_attr else None
         for f, v in _get_attr_samples(prim, "focalLength", start_frame, end_frame):
-            node.focal_samples.append((f, usd_focal_to_ae_zoom(v, comp_width)))
+            ap = None
+            if ap_attr:
+                ap = ap_attr.Get(Usd.TimeCode(f)) if ap_attr.GetTimeSamples() else ap_static
+            if not ap:
+                ap = FILM_WIDTH_MM * MM_TO_USD
+            node.focal_samples.append((f, C.zoom_ratio(v, ap)))
         for f, v in _get_attr_samples(prim, "focusDistance", start_frame, end_frame):
             node.focus_samples.append((f, v * scale))
 
@@ -608,296 +576,95 @@ def _collect_prims(stage, start_frame, end_frame, scale, comp_width,
     return nodes, roots
 
 
-# ----- JSX writer -----
+# ----- Data for the shared AE runtime -----
 
-def _fmt(n):
-    """Compact float formatter -- mirrors the exporter's `fmt`.
-
-    -0 collapses to 0; integers print without decimals; trailing zeros stripped.
-    """
-    if abs(n) < 1e-12:
-        return "0"
-    if abs(n - 1) < 1e-12:
-        return "1"
-    if abs(n + 1) < 1e-12:
-        return "-1"
-    s = "{:.10f}".format(n)
-    s = re.sub(r"(\.\d*?)0+$", r"\1", s)
-    s = re.sub(r"\.$", "", s)
-    return s
-
-
-def _vec3(v):
-    return "[{}, {}, {}]".format(_fmt(v[0]), _fmt(v[1]), _fmt(v[2]))
-
-
-def _is_static(samples, eps=1e-9):
-    if len(samples) <= 1:
-        return True
-    first = samples[0][1]
-    if isinstance(first, (list, tuple)):
-        for _, v in samples[1:]:
-            for a, b in zip(first, v):
-                if abs(a - b) > eps:
-                    return False
-    else:
-        for _, v in samples[1:]:
-            if abs(first - v) > eps:
-                return False
-    return True
-
-
-def _emit_keyed_scalar(out, expr, samples, fps, value_fmt=_fmt):
-    """Emit `expr.setValue(...)` (static) or N `setValueAtTime(...)` calls.
-
-    `expr` is a JSX expression yielding the AE Property to set, e.g.
-    `lyr_foo.transform.position`.  `samples` is [(frame, value), ...] with
-    value either a number or a list/tuple.
-    """
+def _chan(samples, start_frame, end_frame, fps, time_base, conv=None):
+    """[(frame, value)] -> packed channel; per-frame samples carry their own times."""
     if not samples:
-        return
-    if _is_static(samples):
-        v = samples[0][1]
-        if isinstance(v, (list, tuple)):
-            out.append("    {}.setValue({});".format(expr, _vec3(v)))
-        else:
-            out.append("    {}.setValue({});".format(expr, value_fmt(v)))
-        return
-    for f, v in samples:
-        t = f / fps
-        if isinstance(v, (list, tuple)):
-            out.append("    {}.setValueAtTime({}, {});".format(expr, _fmt(t), _vec3(v)))
-        else:
-            out.append("    {}.setValueAtTime({}, {});".format(expr, _fmt(t), value_fmt(v)))
+        return None
+    vals = [conv(v) if conv else v for _, v in samples]
+    if len(vals) == 1:
+        return {"v": vals[0]}
+    times = [round((f - time_base) / float(fps), 6) for f, _ in samples]
+    return C.pack(vals, times)
 
 
-def _emit_anchor_point(out, n):
-    """Emit the anchor-point setValue for Solid/Footage layers.
-
-    Skipped when the anchor matches AE's default (mesh centre); only
-    written when shape/text layers had their geometry offset from the
-    layer's anchor in the original AE comp -- preserves that offset on
-    re-import so rotation pivots and round-tripped mesh extents match.
-    """
-    if n.solid_anchor_x is None or n.solid_anchor_y is None:
-        return
-    w = n.solid_w or 0
-    h = n.solid_h or 0
-    # Default anchor is mesh centre; skip emission when that's what we'd write.
-    if abs(n.solid_anchor_x - w / 2.0) < 0.5 and abs(n.solid_anchor_y - h / 2.0) < 0.5:
-        return
-    out.append("    {}.transform.anchorPoint.setValue([{}, {}, 0]);".format(
-        n.ae_var, _fmt(n.solid_anchor_x), _fmt(n.solid_anchor_y)))
+def _vec(v):
+    return [C.rnd(v[0]), C.rnd(v[1]), C.rnd(v[2])]
 
 
-def _emit_layer_creation(out, n, comp_var):
-    """Emit the JSX line that creates the AE layer for this PrimNode.
-
-    Establishes a JS variable named `n.ae_var` pointing at the new layer,
-    referenced later for parenting and animation.
-    """
-    name = n.ae_name.replace('"', '\\"')
-
-    if n.kind == "Camera":
-        out.append('    var {} = {}.layers.addCamera("{}", [{}.width/2, {}.height/2]);'.format(
-            n.ae_var, comp_var, name, comp_var, comp_var))
-        # 1-node camera (NO_AUTO_ORIENT) so we can set xRotation /
-        # yRotation / zRotation directly.  This is matrix-exact: the
-        # Euler decomposition feeds AE's channel composition
-        # (measured: Rx*Ry*Rz, Z innermost), which reconstructs the original rotation
-        # without going through AE's internal POI-based lookAt (which
-        # would silently drop any roll around the look axis -- visible
-        # on animated 2-node orbit cameras).
-        out.append('    {}.autoOrient = AutoOrientType.NO_AUTO_ORIENT;'.format(n.ae_var))
-        return
-
-    if n.kind in ("Ambient", "Parallel", "Point", "Spot"):
-        out.append('    var {} = {}.layers.addLight("{}", [{}.width/2, {}.height/2]);'.format(
-            n.ae_var, comp_var, name, comp_var, comp_var))
-        light_type_map = {
-            "Ambient":  "LightType.AMBIENT",
-            "Parallel": "LightType.PARALLEL",
-            "Point":    "LightType.POINT",
-            "Spot":     "LightType.SPOT",
-        }
-        out.append('    {}.lightType = {};'.format(n.ae_var, light_type_map[n.kind]))
-        # Parallel and Spot stay 2-node (auto-orient toward POI) -- AE
-        # keeps their rotation channels hidden regardless of autoOrient
-        # mode, so we set Point of Interest instead.  Ambient and Point
-        # have no orientation in AE.
-        return
-
-    if n.kind == "Solid":
-        c = n.solid_color or (0.5, 0.5, 0.5)
+def _layer_data(n, start_frame, end_frame, fps, time_base):
+    kind = n.kind
+    ch = lambda samples, conv=None: _chan(samples, start_frame, end_frame, fps, time_base, conv)
+    if kind == "Camera":
+        ltype = "camera"
+    elif kind in ("Ambient", "Parallel", "Point", "Spot"):
+        ltype = "light"
+    elif kind == "Solid":
+        ltype = "solid"
+    elif kind == "Footage":
+        ltype = "footage"
+    else:
+        ltype = "null"
+    L = C.layer(n.prim.GetPath().pathString, n.ae_name, ltype,
+                parent=n.parent.prim.GetPath().pathString if n.parent is not None else None)
+    if kind != "Ambient" and n.pos_samples:
+        L["pos"] = ch(n.pos_samples, _vec)
+    if n.rot_samples and kind in ("Camera", "Solid", "Footage", "Null"):
+        rx, ry, rz = C.rotation_channels([R for _, R in n.rot_samples])
+        if len(n.rot_samples) > 1:
+            t = [round((f - time_base) / float(fps), 6) for f, _ in n.rot_samples]
+            for c in (rx, ry, rz):
+                if "k" in c:
+                    c["t"] = t
+        L["rx"], L["ry"], L["rz"] = rx, ry, rz
+    if kind in ("Solid", "Footage", "Null") and n.scale_samples:
+        L["scale"] = ch(n.scale_samples, _vec)
+    if kind == "Camera":
+        if n.focal_samples:
+            L["zoom"] = ch(n.focal_samples)
+        if n.focus_samples:
+            L["focus"] = ch(n.focus_samples, C.rnd)
+    if ltype == "light":
+        lg = {"kind": kind.lower()}
+        if n.poi_samples:
+            lg["poi"] = ch(n.poi_samples, _vec)
+        if n.intensity_samples:
+            lg["intensity"] = ch(n.intensity_samples, C.rnd)
+        if n.color_samples:
+            lg["color"] = ch(n.color_samples, _vec)
+        if n.cone_angle_samples:
+            lg["coneAngle"] = ch(n.cone_angle_samples, C.rnd)
+        if n.cone_feather_samples:
+            lg["coneFeather"] = ch(n.cone_feather_samples, C.rnd)
+        L["light"] = lg
+    if kind in ("Solid", "Footage"):
         w = n.solid_w or DEFAULT_COMP_WIDTH
         h = n.solid_h or DEFAULT_COMP_HEIGHT
-        out.append('    var {} = {}.layers.addSolid([{}, {}, {}], "{}", {}, {}, 1.0);'.format(
-            n.ae_var, comp_var, _fmt(c[0]), _fmt(c[1]), _fmt(c[2]), name, w, h))
-        out.append('    {}.threeDLayer = true;'.format(n.ae_var))
-        _emit_anchor_point(out, n)
-        return
-
-    if n.kind == "Footage":
-        # Import the file as a project item, then drop it into the comp.
-        path = (n.footage_path or "").replace("\\", "/").replace('"', '\\"')
-        out.append('    var item_{} = importFootageOnce("{}");'.format(n.ae_var, path))
-        out.append('    var {} = {}.layers.add(item_{});'.format(n.ae_var, comp_var, n.ae_var))
-        out.append('    {}.name = "{}";'.format(n.ae_var, name))
-        out.append('    {}.threeDLayer = true;'.format(n.ae_var))
-        _emit_anchor_point(out, n)
-        return
-
-    # Default: Null.
-    out.append('    var {} = {}.layers.addNull();'.format(n.ae_var, comp_var))
-    out.append('    {}.name = "{}";'.format(n.ae_var, name))
-    out.append('    {}.threeDLayer = true;'.format(n.ae_var))
-
-
-def _emit_layer_animation(out, n, fps):
-    """Emit transform + per-type property keyframes for a created layer.
-
-    AE hides certain transform channels per layer type; setValue on a
-    hidden property errors ("the property or a parent property is
-    hidden").  Suppress what AE doesn't expose:
-      - Ambient: no position, no rotation, no POI (omnipresent).
-      - Point:   position only (omnidirectional, no rotation in AE).
-      - Parallel/Spot: position + pointOfInterest (AE hides the
-                       rotation channels on 2-node lights, so POI is
-                       the only way; loses roll around the look axis).
-      - Camera:  position + Euler rotation (1-node, NO_AUTO_ORIENT).
-                 Matrix-exact round-trip; preserves any roll the
-                 original camera had.
-      - AVLayer: position + rotation + scale.
-    """
-    var = n.ae_var
-
-    has_position = n.kind != "Ambient"
-    use_poi      = n.kind in ("Parallel", "Spot")
-    has_rotation = n.kind in ("Camera", "Solid", "Footage", "Null")
-    has_scale    = n.kind in ("Solid", "Footage", "Null")
-
-    if has_position and n.pos_samples:
-        _emit_keyed_scalar(out, "{}.transform.position".format(var), n.pos_samples, fps)
-
-    if use_poi and n.poi_samples:
-        _emit_keyed_scalar(out, "{}.transform.pointOfInterest".format(var), n.poi_samples, fps)
-
-    if has_rotation and n.rot_samples:
-        xr = [(f, v[0]) for f, v in n.rot_samples]
-        yr = [(f, v[1]) for f, v in n.rot_samples]
-        zr = [(f, v[2]) for f, v in n.rot_samples]
-        _emit_keyed_scalar(out, "{}.transform.xRotation".format(var), xr, fps)
-        _emit_keyed_scalar(out, "{}.transform.yRotation".format(var), yr, fps)
-        _emit_keyed_scalar(out, "{}.transform.zRotation".format(var), zr, fps)
-
-    if has_scale and n.scale_samples:
-        _emit_keyed_scalar(out, "{}.transform.scale".format(var), n.scale_samples, fps)
-
-    # Camera-specific
-    if n.kind == "Camera":
-        if n.focal_samples:
-            _emit_keyed_scalar(out, "{}.cameraOption.zoom".format(var), n.focal_samples, fps)
-        if n.focus_samples:
-            _emit_keyed_scalar(out, "{}.cameraOption.focusDistance".format(var), n.focus_samples, fps)
-
-    # Light-specific
-    if n.kind in ("Ambient", "Parallel", "Point", "Spot"):
-        if n.intensity_samples:
-            _emit_keyed_scalar(out, "{}.lightOption.intensity".format(var), n.intensity_samples, fps)
-        if n.color_samples:
-            _emit_keyed_scalar(out, "{}.lightOption.color".format(var), n.color_samples, fps)
-        if n.kind == "Spot":
-            if n.cone_angle_samples:
-                _emit_keyed_scalar(out, "{}.lightOption.coneAngle".format(var), n.cone_angle_samples, fps)
-            if n.cone_feather_samples:
-                _emit_keyed_scalar(out, "{}.lightOption.coneFeather".format(var), n.cone_feather_samples, fps)
-
-    # Visibility -> in/out points (in seconds).
+        anchor = None
+        if n.solid_anchor_x is not None and n.solid_anchor_y is not None:
+            if abs(n.solid_anchor_x - w / 2.0) >= 0.5 or abs(n.solid_anchor_y - h / 2.0) >= 0.5:
+                anchor = [C.rnd(n.solid_anchor_x), C.rnd(n.solid_anchor_y)]
+        if kind == "Solid":
+            c = n.solid_color or (0.5, 0.5, 0.5)
+            L["solid"] = {"w": w, "h": h, "color": [C.rnd(c[0]), C.rnd(c[1]), C.rnd(c[2])], "anchor": anchor}
+        else:
+            L["footage"] = {"path": (n.footage_path or "").replace("\\", "/"), "w": w, "h": h, "anchor": anchor}
     if n.vis_in_frame is not None:
-        out.append("    {}.inPoint = {};".format(var, _fmt(n.vis_in_frame / fps)))
+        L["inPoint"] = round((n.vis_in_frame - time_base) / float(fps), 6)
     if n.vis_out_frame is not None:
-        out.append("    {}.outPoint = {};".format(var, _fmt((n.vis_out_frame + 1) / fps)))
+        L["outPoint"] = round((n.vis_out_frame + 1 - time_base) / float(fps), 6)
+    return L
 
 
-JSX_HEADER = '''/**
- * Generated by gegenschuss/houdini-toolbox solaris-ae-export
- *
- * Importing a USD scene back into AE: creates a new comp and populates
- * it with cameras, lights, nulls, solids, and footage layers.  Run
- * via File > Scripts > Run Script File.  Footage paths are absolute
- * to whatever they were on the Houdini side -- adjust if needed.
- */
-
-(function() {
-    app.beginUndoGroup("USD -> AE import");
-
-    // Footage importer: dedupe by absolute path so multiple AE layers
-    // pointing at the same file share one project item.
-    var __importedFootage = {};
-    function importFootageOnce(path) {
-        if (!path) return null;
-        if (__importedFootage[path]) return __importedFootage[path];
-        var f = new File(path);
-        if (!f.exists) {
-            // Soft-fail: create a placeholder solid so the script still
-            // completes.  User can relink later via Replace Footage.
-            return null;
-        }
-        var io = new ImportOptions(f);
-        var item = app.project.importFile(io);
-        __importedFootage[path] = item;
-        return item;
-    }
-'''
-
-JSX_FOOTER = '''
-    app.endUndoGroup();
-})();
-'''
-
-
-def _emit_comp(out, comp_var, comp_name, w, h, fps, duration_s, par=1.0):
-    """Emit the JSX that creates the comp and opens it in the viewer."""
-    safe_name = comp_name.replace('"', '\\"')
-    out.append('    var {} = app.project.items.addComp("{}", {}, {}, {}, {}, {});'.format(
-        comp_var, safe_name, w, h, _fmt(par), _fmt(duration_s), _fmt(fps)))
-    out.append('    {}.openInViewer();'.format(comp_var))
-
-
-def _build_jsx(stage, nodes, roots, comp_name, comp_w, comp_h, fps,
-               duration_s, par=1.0):
-    """Assemble the full JSX from an already-sampled prim collection."""
-    out = [JSX_HEADER]
-    comp_var = "comp"
-    _emit_comp(out, comp_var, comp_name, comp_w, comp_h, fps, duration_s, par)
-    out.append("")
-
-    # Pass 1: create every layer.  Iterate in REVERSE so AE's
-    # addNull/addSolid/addLight/addCamera (which inserts each new layer
-    # at index 1, the top of the comp) ends up with the FIRST prim in
-    # the USD on top -- matches AE's natural top-to-bottom layer order
-    # and the order the forward exporter walks `comp.layers`.
-    for n in reversed(nodes):
-        _emit_layer_creation(out, n, comp_var)
-
-    out.append("")
-    out.append("    // Animation + layer properties")
-
-    # Pass 2: animation + per-type properties.
-    for n in nodes:
-        _emit_layer_animation(out, n, fps)
-
-    out.append("")
-    out.append("    // Parent links")
-
-    # Pass 3: parent links.  AE parses parent assignment by reference, so we
-    # do this after all layers exist.  Walk in order; orphans skip.
-    for n in nodes:
-        if n.parent is not None:
-            out.append("    {}.parent = {};".format(n.ae_var, n.parent.ae_var))
-
-    out.append(JSX_FOOTER)
-    return "\n".join(out)
+def _build_data(stage, nodes, comp_name, comp_w, comp_h, fps, start_frame, end_frame,
+                par=1.0, comp_mode="reuse", linear=True, time_base=0, source=""):
+    times = [round((f - time_base) / float(fps), 6) for f in range(int(start_frame), int(end_frame) + 1)]
+    data = C.new_data("Solaris AE Export", "gegenschuss::ae_export", comp_name, fps, comp_w, comp_h,
+                      start_frame, end_frame, times, linear=linear, center_origin=False,
+                      comp_mode=comp_mode, par=par, display_start=0.0, source=source)
+    data["layers"] = [_layer_data(n, start_frame, end_frame, fps, time_base) for n in nodes]
+    return data
 
 
 # ----- Public entry -----
@@ -906,11 +673,16 @@ def usd_to_jsx(stage, out_jsx_path,
                comp_name=None, comp_width=None, comp_height=None, fps=None,
                duration_s=None, scale=DEFAULT_SCALE,
                start_frame=None, end_frame=None,
-               unwrap_ae_scene=True, par=1.0):
+               unwrap_ae_scene=True, par=1.0,
+               comp_mode="reuse", linear=True, time_base=0, runtime_js=None):
     """Walk `stage` and write a JSX to `out_jsx_path`.
 
     `stage` may be a Usd.Stage or a path to a USD file.  All other
     arguments fall back to stage metadata or the DEFAULT_* constants.
+    `comp_mode` "reuse" updates the active comp (or one named `comp_name`)
+    in place, "new" always creates a comp.  `time_base` is the USD frame
+    that lands at 0 s in AE (0 = absolute timecode / fps, as before).
+    `runtime_js` is the shared AE runtime text; None reads ../shared.
 
     Returns a summary dict for caller logging:
         {
@@ -974,8 +746,11 @@ def usd_to_jsx(stage, out_jsx_path,
         stage, start_frame, end_frame, scale, comp_width,
         unwrap_ae_scene=unwrap_ae_scene,
     )
-    text = _build_jsx(stage, nodes, roots, comp_name, comp_width, comp_height,
-                      fps, duration_s, par=par)
+    data = _build_data(stage, nodes, comp_name, comp_width, comp_height, fps,
+                       start_frame, end_frame, par=par, comp_mode=comp_mode, linear=linear,
+                       time_base=time_base, source=stage.GetRootLayer().identifier if stage.GetRootLayer() else "")
+    data["duration"] = round(float(duration_s), 6)
+    text = C.build_jsx(data, runtime_js or _default_runtime_js())
 
     # Write UTF-8.  AE's $.evalFile reads JSX as UTF-8 fine.
     out_dir = os.path.dirname(os.path.abspath(out_jsx_path))

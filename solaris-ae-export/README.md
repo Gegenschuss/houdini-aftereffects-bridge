@@ -105,9 +105,18 @@ install_hda("/path/to/repo/otls/gegenschuss_ae_export.hda")
    - **Frame range** — defaults to the stage's start/end timecodes
    - **Unwrap AE_Scene wrapper** — strips the centre-comp parent the
      AE-side exporter adds, so round-trips stay identity
+   - **Target comp** — update the active comp (or one named like the comp
+     name) in place, or always create a new comp. Layers are tagged with
+     their USD path in the layer Comment, so re-running a newer export
+     replaces their keyframes instead of importing again.
+   - **Linear keyframes**, **USD frame at 0 s** — interpolation and time base
 4. Hit **Save JSX**.  A confirmation dialog reports the prim counts.
 5. In After Effects: `File → Scripts → Run Script File…` → pick the JSX.
-   It creates a new comp and populates it.
+   First run creates the layers; later runs update them in place.
+
+The AE side of the JSX is the bridge's shared `../shared/ae_runtime.js`; the
+maths is `../shared/ae_convention.py`. Camera zoom is `focalLength /
+horizontalAperture * comp width` (no fixed 36 mm assumption any more).
 
 ## What's verified vs not
 
